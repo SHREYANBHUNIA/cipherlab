@@ -27,13 +27,13 @@ pnpm preview
 
 ## GitHub Pages deployment
 
-This repository includes `.github/workflows/deploy-pages.yml`. After pushing the repository to GitHub:
+The repository includes a prebuilt `docs/` artifact for GitHub Pages. After pushing the repository to GitHub:
 
 1. Open **Settings → Pages** in the repository.
-2. Set the source to **GitHub Actions**.
-3. Push to the `main` branch or run the workflow manually from the **Actions** tab.
+2. Choose **Deploy from a branch**, select `main`, and select the `/docs` folder.
+3. Save the setting and wait for GitHub Pages to publish the site.
 
-The workflow builds with a repository-aware Vite base path, creates a `404.html` fallback for the client routes, and publishes `dist/public` to GitHub Pages.
+The `docs/` folder is built with a repository-aware Vite base path and includes a `404.html` fallback for the client routes. When you change the source, run `VITE_BASE_PATH=/cipherlab/ pnpm build`, copy `dist/public` to `docs/`, and commit the refreshed artifact.
 
 ## Interface map
 
