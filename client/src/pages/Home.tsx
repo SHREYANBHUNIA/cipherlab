@@ -38,7 +38,7 @@ import {
 const logoUrl = "/manus-storage/cipherlab-mark_767a7ab9.png";
 const heroUrl = "/manus-storage/cipherlab-hero-desk-retry_2511df8c.png";
 
-type Section = "overview" | "algorithms" | "attacks";
+type Section = "overview" | "algorithms" | "attacks" | "notes" | "api";
 type AlgorithmId = "aes" | "rsa" | "dh" | "sha" | "hmac" | "signatures";
 
 type Algorithm = {
@@ -158,6 +158,20 @@ const attackCards = [
   },
 ];
 
+const fieldNotes = [
+  { id: "OBS-01", tag: "FOUNDATION", title: "Security is a system property.", body: "A primitive can be mathematically sound and still fail when its key, nonce, random source, or verification boundary is handled carelessly.", evidence: "Pair every primitive with the assumption it needs.", tone: "green" },
+  { id: "OBS-02", tag: "HASHING", title: "A digest is not encryption.", body: "A hash gives you a compact fingerprint, not a reversible message. Its useful question is whether input changed—not whether the input is secret.", evidence: "Same input, same digest. Tiny input change, unrelated-looking output.", tone: "blue" },
+  { id: "OBS-03", tag: "KEY EXCHANGE", title: "Public does not mean trusted.", body: "Diffie–Hellman can establish a shared secret, but authentication is what binds that secret to the intended peer.", evidence: "An unverified public key can be replaced in transit.", tone: "orange" },
+  { id: "OBS-04", tag: "OPERATIONS", title: "Randomness is part of the protocol.", body: "A predictable key or nonce collapses the search space. Secure primitives cannot compensate for values that an attacker can guess.", evidence: "Entropy is not a detail; it is material in the construction.", tone: "orange" },
+];
+
+const apiEndpoints = [
+  { method: "POST", path: "/api/v1/experiments/run", purpose: "Run a deterministic teaching experiment", status: "ready" },
+  { method: "GET", path: "/api/v1/algorithms", purpose: "List supported primitives and metadata", status: "ready" },
+  { method: "POST", path: "/api/v1/attacks/simulate", purpose: "Reveal one deliberately weak assumption", status: "ready" },
+  { method: "GET", path: "/api/v1/runs/:id", purpose: "Retrieve an experiment trace", status: "planned" },
+];
+
 const traceSteps = [
   { actor: "Alice", detail: "encrypt(payload, key)", state: "trusted" },
   { actor: "Network", detail: "ciphertext + nonce", state: "observed" },
@@ -245,8 +259,8 @@ function Sidebar({ activeSection, setActiveSection, onClose }: { activeSection: 
       </nav>
       <div className="sidebar__section-label sidebar__section-label--spaced">REFERENCE</div>
       <nav className="sidebar__nav" aria-label="Reference navigation">
-        <button className="sidebar__nav-item sidebar__nav-item--muted"><BookOpenCheck size={17} strokeWidth={1.8} /><span>Field notes</span><ChevronRight size={14} className="sidebar__nav-arrow" /></button>
-        <button className="sidebar__nav-item sidebar__nav-item--muted"><TerminalSquare size={17} strokeWidth={1.8} /><span>API contract</span><ChevronRight size={14} className="sidebar__nav-arrow" /></button>
+        <button className={classNames("sidebar__nav-item", "sidebar__nav-item--muted", activeSection === "notes" && "sidebar__nav-item--active")} onClick={() => { setActiveSection("notes"); onClose?.(); }}><BookOpenCheck size={17} strokeWidth={1.8} /><span>Field notes</span><ChevronRight size={14} className="sidebar__nav-arrow" /></button>
+        <button className={classNames("sidebar__nav-item", "sidebar__nav-item--muted", activeSection === "api" && "sidebar__nav-item--active")} onClick={() => { setActiveSection("api"); onClose?.(); }}><TerminalSquare size={17} strokeWidth={1.8} /><span>API contract</span><ChevronRight size={14} className="sidebar__nav-arrow" /></button>
       </nav>
       <div className="sidebar__footer">
         <div className="sidebar__footer-status"><span className="live-dot" /> simulator online</div>
@@ -258,9 +272,10 @@ function Sidebar({ activeSection, setActiveSection, onClose }: { activeSection: 
 }
 
 function Topbar({ activeSection, onMenu }: { activeSection: Section; onMenu: () => void }) {
+  const sectionLabel = activeSection === "overview" ? "OVERVIEW" : activeSection === "algorithms" ? "ALGORITHMS" : activeSection === "attacks" ? "ATTACK SIMULATIONS" : activeSection === "notes" ? "FIELD NOTES" : "API CONTRACT";
   return <header className="topbar">
     <button className="icon-button topbar__menu" onClick={onMenu} aria-label="Open navigation"><Menu size={20} /></button>
-    <div className="topbar__crumb"><span>WORKSPACE</span><ChevronRight size={14} /><strong>{activeSection === "overview" ? "OVERVIEW" : activeSection === "algorithms" ? "ALGORITHMS" : "ATTACK SIMULATIONS"}</strong></div>
+    <div className="topbar__crumb"><span>WORKSPACE</span><ChevronRight size={14} /><strong>{sectionLabel}</strong></div>
     <div className="topbar__actions"><span className="topbar__status"><span className="live-dot" /> local simulator</span><div className="avatar" aria-label="Current user">CL</div></div>
   </header>;
 }
@@ -340,8 +355,28 @@ function AttackSimulator({ selectedAttack, setSelectedAttack }: { selectedAttack
   </>;
 }
 
+function FieldNotesPage({ setActiveSection }: { setActiveSection: (section: Section) => void }) {
+  return <>
+    <section className="section-heading section-heading--algorithms"><div><div className="eyebrow"><span className="eyebrow__line" /> REFERENCE 03 <span className="eyebrow__slash">/</span> FIELD NOTES</div><h1>Write down what<br /><em>the protocol assumed.</em></h1></div><p>Short observations from the bench. Read these beside an experiment, then return to the trace and test the claim.</p></section>
+    <section className="notes-layout">
+      <div className="notes-stack">{fieldNotes.map((note, index) => <article className="note-card" key={note.id}><div className="note-card__margin"><span>{note.id}</span><span className={classNames("note-card__dot", `note-card__dot--${note.tone}`)} /></div><div className="note-card__body"><div className="note-card__meta"><span className="card-kicker"><BookOpenCheck size={13} /> {note.tag}</span><span>0{index + 1} / 04</span></div><h2>{note.title}</h2><p>{note.body}</p><div className="note-card__evidence"><CheckCircle2 size={15} /><span>{note.evidence}</span></div></div></article>)}</div>
+      <aside className="notes-aside"><div className="notes-aside__stamp"><Beaker size={18} /><span>LAB NOTE<br /><strong>CL—REF</strong></span></div><h2>Keep the boundary visible.</h2><p>When a primitive is introduced, name the thing it protects, the thing it does not protect, and the assumption that connects the two.</p><div className="notes-aside__rule" /><span className="card-kicker">NEXT READING</span><button className="notes-aside__link" onClick={() => setActiveSection("algorithms")}>open primitive index <ArrowRight size={15} /></button><button className="notes-aside__link" onClick={() => setActiveSection("attacks")}>inspect an attack <ArrowRight size={15} /></button></aside>
+    </section>
+  </>;
+}
+
+function ApiContractPage({ setActiveSection }: { setActiveSection: (section: Section) => void }) {
+  return <>
+    <section className="section-heading section-heading--algorithms"><div><div className="eyebrow"><span className="eyebrow__line" /> REFERENCE 04 <span className="eyebrow__slash">/</span> API CONTRACT</div><h1>Every experiment<br /><em>leaves evidence.</em></h1></div><p>A plain-language contract for the future Axum service: small payloads in, deterministic traces out, and no production secrets anywhere near the teaching surface.</p></section>
+    <section className="api-layout">
+      <article className="api-panel"><div className="api-panel__header"><div><span className="card-kicker"><TerminalSquare size={13} /> HTTP SURFACE / V1</span><h2>Experiment endpoints</h2></div><StatusPill tone="green"><span className="live-dot live-dot--small" /> contract mapped</StatusPill></div><div className="endpoint-list">{apiEndpoints.map((endpoint) => <div className="endpoint-row" key={endpoint.path}><span className={classNames("method-badge", `method-badge--${endpoint.method.toLowerCase()}`)}>{endpoint.method}</span><code>{endpoint.path}</code><span className="endpoint-row__purpose">{endpoint.purpose}</span><StatusPill tone={endpoint.status === "ready" ? "green" : "neutral"}>{endpoint.status}</StatusPill></div>)}</div><div className="api-panel__footer"><span>Content-Type: application/json</span><span>deterministic toy mode</span></div></article>
+      <aside className="api-side"><div className="api-side__header"><span className="card-kicker"><Network size={13} /> TRACE SHAPE</span><span className="api-side__version">v1</span></div><div className="api-flow"><div><strong>request</strong><code>payload + primitive</code></div><ArrowRight size={16} /><div><strong>runner</strong><code>Rust / Axum</code></div><ArrowRight size={16} /><div><strong>evidence</strong><code>trace + result</code></div></div><div className="api-side__note"><span className="api-side__mark">!</span><p>API-facing values stay toy-scale by design. This surface teaches protocol shape; it is not a cryptographic service.</p></div><button className="button button--primary button--wide" onClick={() => setActiveSection("algorithms")}><Play size={15} fill="currentColor" /> open a test bench</button></aside>
+    </section>
+  </>;
+}
+
 export default function Home() {
-  const sectionFromPath = (): Section => window.location.pathname === "/algorithms" ? "algorithms" : window.location.pathname === "/attacks" ? "attacks" : "overview";
+  const sectionFromPath = (): Section => window.location.pathname === "/algorithms" ? "algorithms" : window.location.pathname === "/attacks" ? "attacks" : window.location.pathname === "/notes" ? "notes" : window.location.pathname === "/api" ? "api" : "overview";
   const [activeSection, setActiveSection] = useState<Section>(() => sectionFromPath());
   useEffect(() => {
     const handlePopState = () => setActiveSection(sectionFromPath());
@@ -359,6 +394,6 @@ export default function Home() {
   return <div className="app-shell">
     <div className={classNames("mobile-scrim", mobileNavOpen && "mobile-scrim--visible")} onClick={() => setMobileNavOpen(false)} />
     <div className={classNames("sidebar-wrap", mobileNavOpen && "sidebar-wrap--open")}><Sidebar activeSection={activeSection} setActiveSection={navigateSection} onClose={() => setMobileNavOpen(false)} /></div>
-    <main className="main-canvas"><Topbar activeSection={activeSection} onMenu={() => setMobileNavOpen(true)} /><div className="content-wrap">{activeSection === "overview" && <Overview setActiveSection={navigateSection} setSelectedAlgorithm={setSelectedAlgorithm} setSelectedAttack={setSelectedAttack} />}{activeSection === "algorithms" && <AlgorithmExplorer selectedAlgorithm={selectedAlgorithm} setSelectedAlgorithm={setSelectedAlgorithm} />}{activeSection === "attacks" && <AttackSimulator selectedAttack={selectedAttack} setSelectedAttack={setSelectedAttack} />}</div><footer className="page-footer"><span>© 2026 CIPHERLAB / EDUCATIONAL USE</span><span><span className="live-dot live-dot--small" /> all simulations run locally in toy mode</span><span>FIELD NOTE 00—02</span></footer></main>
+    <main className="main-canvas"><Topbar activeSection={activeSection} onMenu={() => setMobileNavOpen(true)} /><div className="content-wrap">{activeSection === "overview" && <Overview setActiveSection={navigateSection} setSelectedAlgorithm={setSelectedAlgorithm} setSelectedAttack={setSelectedAttack} />}{activeSection === "algorithms" && <AlgorithmExplorer selectedAlgorithm={selectedAlgorithm} setSelectedAlgorithm={setSelectedAlgorithm} />}{activeSection === "attacks" && <AttackSimulator selectedAttack={selectedAttack} setSelectedAttack={setSelectedAttack} />}{activeSection === "notes" && <FieldNotesPage setActiveSection={navigateSection} />}{activeSection === "api" && <ApiContractPage setActiveSection={navigateSection} />}</div><footer className="page-footer"><span>© 2026 CIPHERLAB / EDUCATIONAL USE</span><span><span className="live-dot live-dot--small" /> all simulations run locally in toy mode</span><span>FIELD NOTE 00—02</span></footer></main>
   </div>;
 }

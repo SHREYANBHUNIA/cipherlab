@@ -11,7 +11,7 @@ import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
 
 function Router() {
-  return <Switch><Route path="/" component={Home} /><Route path="/algorithms" component={Home} /><Route path="/attacks" component={Home} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={Home} /><Route path="/algorithms" component={Home} /><Route path="/attacks" component={Home} /><Route path="/notes" component={Home} /><Route path="/api" component={Home} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
 }
 
 export default function App() {
