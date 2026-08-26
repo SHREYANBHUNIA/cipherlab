@@ -1,8 +1,6 @@
-# CipherLab Network Editor Repair
+# GitHub Upload
 
-- [x] Inspect the current static network diagram and identify the shared interaction surface.
-- [x] Add draggable node state backed by D3 drag behavior.
-- [x] Add controls to create nodes and remove selected nodes.
-- [x] Preserve Alice, Network, Attacker, and Bob attack-trace semantics.
-- [x] Validate dragging, add/remove controls, routes, and responsive layout.
-- [x] Save a checkpoint and report the update.
+- [ ] Inspect the authenticated GitHub account and check for an existing `cipherlab` repository.
+- [ ] Prepare the project files and deployment documentation for GitHub.
+- [ ] Create or update the GitHub repository and push the latest project.
+- [ ] Verify the remote repository contents and provide deployment guidance.

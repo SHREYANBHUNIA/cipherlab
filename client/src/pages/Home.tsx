@@ -37,8 +37,9 @@ import {
   Zap,
 } from "lucide-react";
 
-const logoUrl = "/manus-storage/cipherlab-mark_767a7ab9.png";
-const heroUrl = "/manus-storage/cipherlab-hero-desk-retry_2511df8c.png";
+const assetUrl = (fileName: string) => `${import.meta.env.BASE_URL}assets/${fileName}`;
+const logoUrl = assetUrl("cipherlab-mark.svg");
+const heroUrl = assetUrl("cipherlab-hero-desk-retry.webp");
 
 type Section = "overview" | "algorithms" | "attacks" | "notes" | "api";
 type AlgorithmId = "aes" | "rsa" | "dh" | "sha" | "hmac" | "signatures";
@@ -442,7 +443,11 @@ function ApiContractPage({ setActiveSection }: { setActiveSection: (section: Sec
 }
 
 export default function Home() {
-  const sectionFromPath = (): Section => window.location.pathname === "/algorithms" ? "algorithms" : window.location.pathname === "/attacks" ? "attacks" : window.location.pathname === "/notes" ? "notes" : window.location.pathname === "/api" ? "api" : "overview";
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const sectionFromPath = (): Section => {
+    const currentPath = window.location.pathname.replace(new RegExp(`^${basePath}`), "") || "/";
+    return currentPath === "/algorithms" ? "algorithms" : currentPath === "/attacks" ? "attacks" : currentPath === "/notes" ? "notes" : currentPath === "/api" ? "api" : "overview";
+  };
   const [activeSection, setActiveSection] = useState<Section>(() => sectionFromPath());
   useEffect(() => {
     const handlePopState = () => setActiveSection(sectionFromPath());
@@ -451,7 +456,7 @@ export default function Home() {
   }, []);
   const navigateSection = (section: Section) => {
     setActiveSection(section);
-    window.history.pushState({}, "", section === "overview" ? "/" : `/${section}`);
+    window.history.pushState({}, "", `${basePath}${section === "overview" ? "/" : `/${section}`}`);
   };
   const [selectedAlgorithm, setSelectedAlgorithm] = useState<AlgorithmId>("aes");
   const [selectedAttack, setSelectedAttack] = useState("mitm");
