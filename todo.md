@@ -1,9 +1,8 @@
-# CipherLab Navigation Repair
+# CipherLab Network Editor Repair
 
-- [x] Inspect current sidebar items and route/state mapping.
-- [x] Add dedicated workspace content for Field Notes.
-- [x] Add dedicated workspace content for API Contract.
-- [x] Ensure Overview, Algorithms, and Attack Simulations use stable routes and active navigation state.
-- [x] Replace inert reference navigation controls with working handlers.
-- [x] Validate all workspace routes and responsive layout.
-- [x] Save a checkpoint and report the repair.
+- [x] Inspect the current static network diagram and identify the shared interaction surface.
+- [x] Add draggable node state backed by D3 drag behavior.
+- [x] Add controls to create nodes and remove selected nodes.
+- [x] Preserve Alice, Network, Attacker, and Bob attack-trace semantics.
+- [x] Validate dragging, add/remove controls, routes, and responsive layout.
+- [x] Save a checkpoint and report the update.

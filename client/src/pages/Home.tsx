@@ -3,7 +3,7 @@
  * This page keeps evidence visible, contrasts safe and weak implementations, and uses
  * restrained copper/green motion only when a packet or experiment state changes.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import {
   Activity,
@@ -24,6 +24,8 @@ import {
   Menu,
   Network,
   Play,
+  Plus,
+  Trash2,
   Radio,
   RefreshCcw,
   ScanSearch,
@@ -187,32 +189,96 @@ function StatusPill({ children, tone = "neutral" }: { children: React.ReactNode;
   return <span className={classNames("status-pill", `status-pill--${tone}`)}>{children}</span>;
 }
 
-function NetworkDiagram({ attackRan }: { attackRan: boolean }) {
+type NetworkNodeKind = "alice" | "network" | "relay" | "bob" | "attacker";
+type NetworkNode = { id: string; actor: string; detail: string; kind: NetworkNodeKind; x: number; y: number };
+
+const initialNetworkNodes: NetworkNode[] = [
+  { id: "alice", actor: "Alice", detail: "encrypt", kind: "alice", x: 116, y: 92 },
+  { id: "network", actor: "Network", detail: "ciphertext", kind: "network", x: 332, y: 92 },
+  { id: "bob", actor: "Bob", detail: "verify", kind: "bob", x: 814, y: 92 },
+  { id: "attacker", actor: "Attacker", detail: "watching", kind: "attacker", x: 590, y: 187 },
+];
+
+function NetworkDiagram({ attackRan, editable = false }: { attackRan: boolean; editable?: boolean }) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [nodes, setNodes] = useState<NetworkNode[]>(() => initialNetworkNodes.map((node) => ({ ...node })));
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const primaryNodes = nodes.filter((node) => node.kind !== "attacker");
+  const attacker = nodes.find((node) => node.kind === "attacker");
+
+  useEffect(() => {
+    if (!editable || !svgRef.current) return;
+    const clampX = (value: number) => Math.max(44, Math.min(856, value));
+    const clampY = (value: number) => Math.max(52, Math.min(216, value));
+    const dragBehavior = d3.drag<SVGGElement, NetworkNode>()
+      .on("start", (_event, node) => setSelectedId(node.id))
+      .on("drag", (event, node) => {
+        const x = clampX(event.x);
+        const y = clampY(event.y);
+        setNodes((current) => current.map((item) => item.id === node.id ? { ...item, x, y } : item));
+      });
+    const selection = d3.select(svgRef.current).selectAll<SVGGElement, NetworkNode>("g.editable-node").data(nodes);
+    selection.call(dragBehavior);
+    return () => { selection.on(".drag", null); };
+  }, [editable, nodes]);
+
+  const pathFor = (source: NetworkNode, target: NetworkNode) => {
+    const middle = (source.x + target.x) / 2;
+    return `M ${source.x} ${source.y} C ${middle} ${source.y}, ${middle} ${target.y}, ${target.x} ${target.y}`;
+  };
+
+  const addNode = () => {
+    const relayNumber = primaryNodes.filter((node) => node.kind === "relay").length + 1;
+    const newNode: NetworkNode = { id: `relay-${Date.now()}`, actor: `Relay ${relayNumber}`, detail: "new hop", kind: "relay", x: 565, y: 92 };
+    setNodes((current) => {
+      const next = [...current];
+      const bobIndex = next.findIndex((node) => node.id === "bob");
+      if (bobIndex >= 0) next.splice(bobIndex, 0, newNode); else next.push(newNode);
+      return next;
+    });
+    setSelectedId(newNode.id);
+  };
+
+  const selectedNode = nodes.find((node) => node.id === selectedId);
+  const canRemoveSelected = selectedNode?.kind === "network" || selectedNode?.kind === "relay";
+  const removeSelectedNode = () => {
+    if (!selectedId || !canRemoveSelected) return;
+    setNodes((current) => current.filter((node) => node.id !== selectedId));
+    setSelectedId(null);
+  };
+
   return (
-    <div className="network-diagram" aria-label="Alice sends an encrypted message through a network to Bob while an attacker observes it">
-      <svg viewBox="0 0 900 270" role="img" aria-hidden="true">
-        <defs>
-          <marker id="trace-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
-          </marker>
-          <filter id="soft-paper-shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="5" stdDeviation="5" floodColor="#1f2421" floodOpacity="0.16" />
-          </filter>
-        </defs>
-        <path className="trace-guide" d="M116 92 C240 92 240 92 332 92 S510 92 590 92 S748 92 814 92" />
-        <path className={classNames("trace-flow", attackRan && "trace-flow--active")} d="M116 92 C240 92 240 92 332 92 S510 92 590 92 S748 92 814 92" markerEnd="url(#trace-arrow)" />
-        <path className={classNames("trace-intercept", attackRan && "trace-intercept--active")} d="M590 92 C590 92 590 187 590 187" markerEnd="url(#trace-arrow)" />
-        <circle className="trace-node trace-node--alice" cx="116" cy="92" r="28" />
-        <circle className="trace-node trace-node--network" cx="332" cy="92" r="28" />
-        <circle className="trace-node trace-node--network" cx="814" cy="92" r="28" />
-        <circle className={classNames("trace-node trace-node--attacker", attackRan && "trace-node--active")} cx="590" cy="187" r="28" />
-        <g className="trace-label" transform="translate(74 136)"><text>Alice</text><text y="20" className="trace-label__mono">encrypt</text></g>
-        <g className="trace-label" transform="translate(283 136)"><text>Network</text><text y="20" className="trace-label__mono">ciphertext</text></g>
-        <g className="trace-label" transform="translate(548 231)"><text>Attacker</text><text y="20" className="trace-label__mono">{attackRan ? "replayed" : "watching"}</text></g>
-        <g className="trace-label" transform="translate(770 136)"><text>Bob</text><text y="20" className="trace-label__mono">verify</text></g>
-        <text x="432" y="67" className="trace-packet">encrypted message</text>
-        <text x="609" y="151" className="trace-packet trace-packet--orange">intercepted</text>
-      </svg>
+    <div className="network-editor">
+      <div className="network-diagram" aria-label="Interactive network graph. Drag nodes to reposition them, click to select, then add or remove nodes.">
+        <svg ref={svgRef} viewBox="0 0 900 270" role="img" aria-hidden="true">
+          <defs>
+            <marker id="trace-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
+            </marker>
+            <filter id="soft-paper-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="5" stdDeviation="5" floodColor="#1f2421" floodOpacity="0.16" />
+            </filter>
+          </defs>
+          {primaryNodes.slice(0, -1).map((source, index) => {
+            const target = primaryNodes[index + 1];
+            return <path key={`${source.id}-${target.id}`} className={classNames("trace-flow", attackRan && "trace-flow--active")} d={pathFor(source, target)} markerEnd="url(#trace-arrow)" />;
+          })}
+          {primaryNodes.length > 1 && <path className="trace-guide" d={pathFor(primaryNodes[0], primaryNodes[primaryNodes.length - 1])} />}
+          {attacker && primaryNodes.length > 0 && <path className={classNames("trace-intercept", attackRan && "trace-intercept--active")} d={pathFor(primaryNodes[Math.min(1, primaryNodes.length - 1)], attacker)} markerEnd="url(#trace-arrow)" />}
+          {primaryNodes.map((node, index) => <g key={node.id} className={classNames("editable-node", selectedId === node.id && "editable-node--selected")} transform={`translate(${node.x} ${node.y})`} data-node-id={node.id} onClick={() => setSelectedId(node.id)} role="button" tabIndex={editable ? 0 : -1} aria-label={`${node.actor} node`} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedId(node.id); }}>
+            <circle className={classNames("trace-node", node.kind === "alice" ? "trace-node--alice" : node.kind === "relay" ? "trace-node--relay" : "trace-node--network")} r="28" />
+            <g className="trace-label" transform="translate(-42 44)"><text>{node.actor}</text><text y="20" className="trace-label__mono">{node.detail}</text></g>
+            {index === 0 && <text x={(primaryNodes[0].x === node.x ? primaryNodes[1]?.x ?? node.x : node.x) - node.x + 100} y="-25" className="trace-packet">encrypted message</text>}
+          </g>)}
+          {attacker && <g className={classNames("editable-node", selectedId === attacker.id && "editable-node--selected")} transform={`translate(${attacker.x} ${attacker.y})`} data-node-id={attacker.id} onClick={() => setSelectedId(attacker.id)} role="button" tabIndex={editable ? 0 : -1} aria-label="Attacker node" onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedId(attacker.id); }}>
+            <circle className={classNames("trace-node trace-node--attacker", attackRan && "trace-node--active")} r="28" />
+            <g className="trace-label" transform="translate(-42 44)"><text>Attacker</text><text y="20" className="trace-label__mono">{attackRan ? "replayed" : "watching"}</text></g>
+            <text x="20" y="-36" className="trace-packet trace-packet--orange">intercepted</text>
+          </g>}
+          {primaryNodes.length > 1 && <text x={(primaryNodes[0].x + primaryNodes[1].x) / 2} y={Math.min(primaryNodes[0].y, primaryNodes[1].y) - 25} className="trace-packet">encrypted message</text>}
+        </svg>
+      </div>
+      {editable && <div className="network-editor__toolbar"><span className="network-editor__hint"><span className="network-editor__cursor" /> drag to reposition <span className="network-editor__separator">·</span> click to select <span className="network-editor__separator">·</span> core actors stay</span><div className="network-editor__actions"><button className="network-editor__button" onClick={addNode}><Plus size={13} /> add node</button><button className="network-editor__button network-editor__button--remove" onClick={removeSelectedNode} disabled={!canRemoveSelected}><Trash2 size={13} /> remove selected</button></div></div>}
     </div>
   );
 }
@@ -302,7 +368,7 @@ function Overview({ setActiveSection, setSelectedAlgorithm, setSelectedAttack }:
     <section className="bench-grid">
       <article className="bench-card bench-card--trace">
         <div className="card-head"><div><span className="card-kicker"><CircleDot size={13} /> LIVE TRACE / 01</span><h3>Message in transit</h3></div><StatusPill tone="green"><span className="live-dot live-dot--small" /> ready to run</StatusPill></div>
-        <NetworkDiagram attackRan={false} />
+        <NetworkDiagram attackRan={false} editable />
         <div className="trace-footer"><span><span className="trace-footer__key trace-footer__key--green" /> trusted flow</span><span><span className="trace-footer__key trace-footer__key--orange" /> interception point</span><button className="icon-text-button" onClick={() => { setSelectedAttack("mitm"); setActiveSection("attacks"); }}>open scenario <ArrowRight size={14} /></button></div>
       </article>
       <article className="bench-card bench-card--brief">
@@ -350,7 +416,7 @@ function AttackSimulator({ selectedAttack, setSelectedAttack }: { selectedAttack
     <section className="section-heading section-heading--algorithms"><div><div className="eyebrow"><span className="eyebrow__line" /> EXPERIMENT 02 <span className="eyebrow__slash">/</span> ADVERSARIAL LAB</div><h1>Where the protocol<br /><em>gives something away.</em></h1></div><p>These are toy-scale attacks for learning. The point is not to break real systems—it is to see the assumption that made the break possible.</p></section>
     <section className="attack-lab-layout">
       <div className="attack-selector"><div className="index-title"><span>SCENARIO INDEX</span><span>04 TOTAL</span></div>{attackCards.map((attack, index) => { const AttackIcon = attack.icon; return <button className={classNames("scenario-item", selected.id === attack.id && "scenario-item--active")} key={attack.id} onClick={() => { setSelectedAttack(attack.id); setAttackRan(false); }}><span className="algorithm-index__number">0{index + 1}</span><span className={classNames("scenario-item__icon", `scenario-item__icon--${attack.accent}`)}><AttackIcon size={16} /></span><span className="scenario-item__copy"><strong>{attack.title}</strong><small>{attack.label}</small></span><span className={classNames("risk-label", attack.risk === "HIGH" ? "risk-label--high" : "risk-label--low")}>{attack.risk}</span></button>; })}</div>
-      <article className="attack-lab-card"><div className="attack-lab-card__header"><div className="algorithm-detail__title"><span className="algorithm-detail__icon algorithm-detail__icon--orange"><Icon size={21} /></span><div><span className="card-kicker">{selected.label} / ADVERSARIAL NOTE</span><h2>{selected.title}</h2></div></div><StatusPill tone="orange"><TriangleAlert size={13} /> deliberately weak</StatusPill></div><p className="attack-lab-card__description">{selected.description}</p><div className="attack-lab-card__metric"><span>OBSERVED WEAKNESS</span><strong>{selected.metric}</strong><span className="attack-lab-card__metric-note">reduced teaching space</span></div><div className="attack-lab-card__visual"><NetworkDiagram attackRan={attackRan} /><div className="visual-stamp">ATTACK SURFACE<br /><strong>{attackRan ? "EXPOSED" : "MAPPED"}</strong></div></div><div className="attack-lab-card__controls"><div className="step-status"><span className="step-status__label">RUN STATE</span><strong>{attackRan ? "evidence captured" : "awaiting input"}</strong><span>{attackRan ? "The weak assumption is now visible in the trace." : "Run the scenario to reveal the break."}</span></div><div className="control-actions"><button className="button button--primary" onClick={() => setAttackRan(true)}><Play size={15} fill="currentColor" /> run attack</button><button className="button button--ghost" onClick={() => setAttackRan(false)}><RefreshCcw size={15} /> reset</button></div></div><div className={classNames("repair-note", attackRan && "repair-note--visible")}><span className="repair-note__icon"><ShieldCheck size={16} /></span><div><span className="repair-note__label">REPAIR THE PROTOCOL</span><p>{selected.id === "replay" ? "Include a unique nonce or monotonic counter, and reject messages that have already been seen." : selected.id === "mitm" ? "Authenticate the key exchange so Alice and Bob can verify who they are speaking with." : selected.id === "password" ? "Use a slow password hash with a unique salt, then enforce a strong password policy." : "Use a modern hash with an output space large enough that accidental matches are infeasible."}</p></div></div></article>
+      <article className="attack-lab-card"><div className="attack-lab-card__header"><div className="algorithm-detail__title"><span className="algorithm-detail__icon algorithm-detail__icon--orange"><Icon size={21} /></span><div><span className="card-kicker">{selected.label} / ADVERSARIAL NOTE</span><h2>{selected.title}</h2></div></div><StatusPill tone="orange"><TriangleAlert size={13} /> deliberately weak</StatusPill></div><p className="attack-lab-card__description">{selected.description}</p><div className="attack-lab-card__metric"><span>OBSERVED WEAKNESS</span><strong>{selected.metric}</strong><span className="attack-lab-card__metric-note">reduced teaching space</span></div><div className="attack-lab-card__visual"><NetworkDiagram attackRan={attackRan} editable /><div className="visual-stamp">ATTACK SURFACE<br /><strong>{attackRan ? "EXPOSED" : "MAPPED"}</strong></div></div><div className="attack-lab-card__controls"><div className="step-status"><span className="step-status__label">RUN STATE</span><strong>{attackRan ? "evidence captured" : "awaiting input"}</strong><span>{attackRan ? "The weak assumption is now visible in the trace." : "Run the scenario to reveal the break."}</span></div><div className="control-actions"><button className="button button--primary" onClick={() => setAttackRan(true)}><Play size={15} fill="currentColor" /> run attack</button><button className="button button--ghost" onClick={() => setAttackRan(false)}><RefreshCcw size={15} /> reset</button></div></div><div className={classNames("repair-note", attackRan && "repair-note--visible")}><span className="repair-note__icon"><ShieldCheck size={16} /></span><div><span className="repair-note__label">REPAIR THE PROTOCOL</span><p>{selected.id === "replay" ? "Include a unique nonce or monotonic counter, and reject messages that have already been seen." : selected.id === "mitm" ? "Authenticate the key exchange so Alice and Bob can verify who they are speaking with." : selected.id === "password" ? "Use a slow password hash with a unique salt, then enforce a strong password policy." : "Use a modern hash with an output space large enough that accidental matches are infeasible."}</p></div></div></article>
     </section>
   </>;
 }
